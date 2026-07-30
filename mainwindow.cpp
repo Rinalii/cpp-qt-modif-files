@@ -6,11 +6,12 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QThread>
 #include <QVBoxLayout>
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-{
+#include "filemodifier.h"
+
+void MainWindow::CreateUI() {
     QWidget *central = new QWidget(this);
     QVBoxLayout *main_layout = new QVBoxLayout(central);
 
@@ -58,9 +59,48 @@ MainWindow::MainWindow(QWidget *parent)
     main_layout->addWidget(period_edit_);
     main_layout->addWidget(hex_edit_);
 
-    QPushButton *run_btn = new QPushButton("Начать");
-    main_layout->addWidget(run_btn);
+    run_btn_ = new QPushButton("Начать");
+    main_layout->addWidget(run_btn_);
     setCentralWidget(central);
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent) {
+    CreateUI();
+
+    // Создаём воркер без родителя, чтобы безопасно переместить в поток
+    worker_ = new FileModifier(nullptr);
+    // Создаём поток
+    worker_thread_ = new QThread(this);
+    // Перемещаем воркер в поток
+    worker_->moveToThread(worker_thread_);
+
+    // Соединяем сигнал запуска из GUI со слотом воркера
+    connect(this, &MainWindow::startProcessing, worker_, &FileModifier::modifyFile);
+
+    // Запускаем поток
+    worker_thread_->start();
+
+    connect(run_btn_, &QPushButton::clicked, this, &MainWindow::slotStart);
+}
+
+MainWindow::~MainWindow() {
+    // Просим воркер остановиться (если он ещё работает)
+    worker_->slotExitRequested();
+
+    // Завершаем поток и ждём его остановки
+    worker_thread_->quit();
+    worker_thread_->wait();
+
+    delete worker_;
+}
+
+void MainWindow::slotStart() {
+    QString input = in_path_edit_->text();
+    QString output = out_path_edit_->text();
+    QByteArray key = QByteArray::fromHex(hex_edit_->text().toUtf8());
+    bool remove = del_ifile_chck_->isChecked();
+
+    // Испускаем сигнал для обработки в потоке воркера
+    emit startProcessing(input, output, key, remove);
+}
