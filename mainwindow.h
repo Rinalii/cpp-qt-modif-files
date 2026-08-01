@@ -24,7 +24,7 @@ public slots:
     void slotStart();
 
 signals:
-    void startProcessing(const QString &inputPath, const QString &outputPath,
+    void signalStartProcessing(const QString &inputPath, const QString &outputPath, const QString &mask,
         const QByteArray &key, bool removeSource);
 
 private:

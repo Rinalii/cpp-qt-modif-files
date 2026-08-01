@@ -48,6 +48,7 @@ void MainWindow::CreateUI() {
     period_edit_ = new QLineEdit();
 
     hex_edit_ = new QLineEdit();
+    hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
 
     main_layout->addWidget(mask_edit_);
     main_layout->addWidget(del_ifile_chck_);
@@ -76,7 +77,7 @@ MainWindow::MainWindow(QWidget *parent)
     worker_->moveToThread(worker_thread_);
 
     // Соединяем сигнал запуска из GUI со слотом воркера
-    connect(this, &MainWindow::startProcessing, worker_, &FileModifier::modifyFile);
+    connect(this, &MainWindow::signalStartProcessing, worker_, &FileModifier::ModifyFiles);
 
     // Запускаем поток
     worker_thread_->start();
@@ -98,9 +99,10 @@ MainWindow::~MainWindow() {
 void MainWindow::slotStart() {
     QString input = in_path_edit_->text();
     QString output = out_path_edit_->text();
+    QString mask = mask_edit_->text();
     QByteArray key = QByteArray::fromHex(hex_edit_->text().toUtf8());
     bool remove = del_ifile_chck_->isChecked();
 
     // Испускаем сигнал для обработки в потоке воркера
-    emit startProcessing(input, output, key, remove);
+    emit signalStartProcessing(input, output, mask, key, remove);
 }

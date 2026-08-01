@@ -10,12 +10,11 @@ class FileModifier : public QObject
     Q_OBJECT
 public:
     explicit FileModifier(QObject *parent = nullptr);
-
-    void modifyFile(const QString &input_path, const QString &output_path, const QByteArray &key, bool remove_source);
+    void ModifyFiles(const QString &input_path, const QString &output_path, const QString& mask, const QByteArray &key, bool remove_source);
 
 signals:
-    void progress(int percent);
-    void finished(bool success, const QString &errorMessage);
+    void signalProgress(int percent);
+    void signalFinished(bool success, const QString &errorMessage);
 
 public slots:
     void slotExitRequested();
@@ -23,9 +22,17 @@ public slots:
 private:
     QString input_path_;
     QString output_path_;
+    QStringList filenames_;
     QByteArray key_;
     bool remove_source_;
     std::atomic<bool> exit_requested_{false};
+    qint64 bytes_processed_;
+    qint64 total_bytes_;
+
+    bool ModifyFile(const QString &input_filepath, const QString &output_filepath);
+    bool IsKeyValid(const QByteArray &key);
+    QStringList GetSuitableFileNames(const QString& in_path, const QString& mask);
+    bool CalculateTotalBytes();
 };
 
 #endif // FILEMODIFIER_H

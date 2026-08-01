@@ -2,51 +2,36 @@
 
 #include <QFile>
 #include <QDebug>
+#include <QDir>
 
 FileModifier::FileModifier(QObject *parent)
     : QObject(parent) {
 }
 
-void FileModifier::modifyFile(const QString &input_path, const QString &output_path, const QByteArray &key, bool remove_source) {
-    input_path_ = input_path;
-    output_path_ = output_path;
-    key_ = key;
-    remove_source_ = remove_source;
-    exit_requested_ = false;
-
-    if (key_.isEmpty()) {
-        emit finished(false, "Key cannot be empty");
-        return;
-    }
-    if (key_.size() != 8) {
-        emit finished(false, "Key must be exactly 8 bytes (16 hex digits)");
-        return;
-    }
-
-    QFile in_file(input_path_);
+bool FileModifier::ModifyFile(const QString &input_filepath, const QString &output_filepath) {
+    QFile in_file(input_filepath);
     if (!in_file.open(QIODevice::ReadOnly)) {
-        emit finished(false, "Cannot open input file: " + input_path_);
-        return;
+        emit signalFinished(false, "Cannot open input file: " + input_filepath);
+        return false;
     }
-    QFile out_file(output_path_);
+    QFile out_file(output_filepath);
     if (!out_file.open(QIODevice::WriteOnly)) {
-        emit finished(false, "Cannot open output file: " + output_path_);
-        return;
+        in_file.close();
+        emit signalFinished(false, "Cannot open output file: " + output_filepath);
+        return false;
     }
 
-    qint64 total_bytes = in_file.size();
-    const qint64 buffer_size = 1024 * 1024; // 1 МБ
-    const int key_size = key_.size();   // 8 Б
-
+    const qint64 buffer_size = 1024 * 1024;
+    const int key_size = key_.size();
     QByteArray chunk;
-    qint64 bytes_processed = 0;
 
     while (!in_file.atEnd()) {
         if (exit_requested_.load()) {
             out_file.close();
-            QFile::remove(output_path_); // удаляем неполный выходной файл
-            emit finished(false, "Operation cancelled by user");
-            return;
+            QFile::remove(output_filepath);
+            in_file.close();
+            emit signalFinished(false, "Operation cancelled by user");
+            return false;
         }
 
         chunk = in_file.read(buffer_size);
@@ -55,23 +40,95 @@ void FileModifier::modifyFile(const QString &input_path, const QString &output_p
         }
         out_file.write(chunk);
 
-        bytes_processed += chunk.size();
-        int percent = static_cast<int>((bytes_processed * 100) / total_bytes);
-        emit progress(percent); // отправляем сигнал в GUI
+        bytes_processed_ += chunk.size();
+        int percent = (bytes_processed_ * 100) / total_bytes_;
+        emit signalProgress(percent);
     }
 
     in_file.close();
     out_file.close();
+    return true;
+}
 
-    if (remove_source_) {
-        if (!QFile::remove(input_path_)) {
-            emit finished(false, "Cannot remove source file: " + input_path_);
-            return;
-        }
+bool FileModifier::IsKeyValid(const QByteArray &key) {
+    if (key.isEmpty()) {
+        emit signalFinished(false, "Key cannot be empty");
+        return false;
     }
-    emit finished(true, QString());
+    if (key.size() != 8) {
+        emit signalFinished(false, "Key must be exactly 8 bytes (16 hex digits)");
+        return false;
+    }
+    return true;
+}
+
+void FileModifier::ModifyFiles(const QString &input_path, const QString &output_path, const QString &mask, const QByteArray &key, bool remove_source) {
+    if (!IsKeyValid(key)) return;
+    input_path_ = input_path;
+    output_path_ = output_path;
+    key_ = key;
+    remove_source_ = remove_source;
+    exit_requested_.store(false);
+
+    filenames_ = GetSuitableFileNames(input_path, mask);
+    bytes_processed_ = 0;
+
+    if(!CalculateTotalBytes()) return;
+
+    for (const QString &filename : filenames_) {
+        if (exit_requested_.load()) return;
+        QString input_file = input_path + "/" + filename;
+        QString output_file = output_path + "/" + filename;
+        if(!ModifyFile(input_file, output_file)) return;
+    }
 }
 
 void FileModifier::slotExitRequested() {
     exit_requested_.store(true);
+}
+
+QStringList FileModifier::GetSuitableFileNames(const QString &in_path, const QString &mask) {
+    QDir dir(in_path);
+    if (!dir.exists()) {
+        emit signalFinished(false, "Directory does not exist");
+        return QStringList{};
+    }
+
+    QStringList filters;
+    if (mask.isEmpty()) {
+        // По умолчанию – все файлы
+        filters << "*";
+    } else {
+        QStringList parts = mask.split(',', Qt::SkipEmptyParts);
+        for (QString part : parts) {
+            part = part.trimmed();
+            if (part.isEmpty()) continue;
+            if (part.contains('*') || part.contains('?')) {
+                filters << part;
+            } else if (part.startsWith('.')) {  // Начинается с точки – считаем расширением, добавляем "*"
+                filters << "*" + part;
+            } else {
+                filters << part;                // точное имя
+            }
+        }
+    }
+    if (filters.isEmpty()) {
+        filters << "*";
+    }
+
+    dir.setNameFilters(filters);
+    dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
+    return dir.entryList();
+}
+
+bool FileModifier::CalculateTotalBytes() {
+    for (const QString &filename : filenames_) {
+        QString input_file = input_path_ + "/" + filename;
+        if (!QFileInfo::exists(input_file)) {
+            emit signalFinished(false, "File " + input_file + " doesn't exists");
+            return false;
+        }
+        total_bytes_ += QFileInfo(input_file).size();
+    }
+    return true;
 }
