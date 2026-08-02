@@ -103,6 +103,10 @@ void MainWindow::slotStart() {
     QByteArray key = QByteArray::fromHex(hex_edit_->text().toUtf8());
     bool remove = del_ifile_chck_->isChecked();
 
+    int id = out_file_name_gr_->checkedId();
+    bool modify_filename = false;
+    if(id == 1) modify_filename = true;
+
     // Испускаем сигнал для обработки в потоке воркера
-    emit signalStartProcessing(input, output, mask, key, remove);
+    emit signalStartProcessing(input, output, modify_filename, mask, key, remove);
 }
