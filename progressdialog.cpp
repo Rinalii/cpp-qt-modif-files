@@ -92,11 +92,11 @@ void ProgressDialog::closeEvent(QCloseEvent *event) {
                                       QMessageBox::Yes | QMessageBox::No);
         if (reply == QMessageBox::Yes) {
             emit signalStopRequested();
-            event->accept();
+            accept();
         } else {
             event->ignore();
         }
     } else {
-        event->accept();
+        accept();
     }
 }
