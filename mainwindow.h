@@ -11,6 +11,7 @@ class QPushButton;
 class QThread;
 
 class FileModifier;
+class ProgressDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -22,10 +23,15 @@ public:
 
 public slots:
     void slotStart();
+    void slotDialogFinished();
+
+    void slotExitRequested();
+    void slotPauseRequested();
+    void slotResumeRequested();
 
 signals:
-    void signalStartProcessing(const QString &inputPath, const QString &outputPath, bool modify_filename, const QString &mask,
-        const QByteArray &key, bool removeSource);
+    void signalStartProcessing(const QString &input_path, const QString &output_path, bool modify_filename, const QString &mask,
+        const QByteArray &key, bool remove_source);
 
 private:
     QLineEdit   *mask_edit_;
@@ -41,6 +47,7 @@ private:
 
     FileModifier *worker_;
     QThread *worker_thread_;
+    ProgressDialog *progress_dialog_;
 
     void CreateUI();
 };

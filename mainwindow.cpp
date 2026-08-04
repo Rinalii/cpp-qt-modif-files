@@ -4,12 +4,14 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QThread>
 #include <QVBoxLayout>
 
 #include "filemodifier.h"
+#include "progressdialog.h"
 
 void MainWindow::CreateUI() {
     QWidget *central = new QWidget(this);
@@ -66,7 +68,8 @@ void MainWindow::CreateUI() {
 }
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent) {
+    : QMainWindow(parent)
+    , progress_dialog_(nullptr) {
     CreateUI();
 
     // Создаём воркер без родителя, чтобы безопасно переместить в поток
@@ -86,8 +89,13 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() {
+    if (progress_dialog_) {
+        progress_dialog_->close();
+        progress_dialog_->deleteLater();
+    }
+
     // Просим воркер остановиться (если он ещё работает)
-    worker_->slotExitRequested();
+    worker_->RequestExit();
 
     // Завершаем поток и ждём его остановки
     worker_thread_->quit();
@@ -97,16 +105,73 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::slotStart() {
+    if (progress_dialog_) {
+        return;
+    }
+
     QString input = in_path_edit_->text();
     QString output = out_path_edit_->text();
     QString mask = mask_edit_->text();
     QByteArray key = QByteArray::fromHex(hex_edit_->text().toUtf8());
     bool remove = del_ifile_chck_->isChecked();
+    bool modify_filename = (out_file_name_gr_->checkedId() == 1);
 
-    int id = out_file_name_gr_->checkedId();
-    bool modify_filename = false;
-    if(id == 1) modify_filename = true;
+    // Проверка обязательных полей
+    if (input.isEmpty() || output.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "Укажите входную и выходную папки");
+        return;
+    }
 
-    // Испускаем сигнал для обработки в потоке воркера
+    if (key.isEmpty() || key.size() != 8) {
+        QMessageBox::warning(this, "Ошибка", "Ключ должен быть 16 шестнадцатеричных символов");
+        return;
+    }
+
+    // Блокируем кнопку запуска
+    run_btn_->setEnabled(false);
+
+    // Создаём диалог прогресса
+    progress_dialog_ = new ProgressDialog(this);
+
+    // Подключаем сигналы диалога
+    connect(progress_dialog_, &ProgressDialog::signalStopRequested, this, &MainWindow::slotExitRequested);
+    connect(progress_dialog_, &ProgressDialog::signalPauseRequested, this, &MainWindow::slotPauseRequested);
+    connect(progress_dialog_, &ProgressDialog::signalResumeRequested, this, &MainWindow::slotResumeRequested);
+
+    // Подключаем сигналы из воркера в GUI
+    connect(worker_, &FileModifier::signalProgress, progress_dialog_, &ProgressDialog::slotUpdateProgress);
+    connect(worker_, &FileModifier::signalStartFileModification, progress_dialog_, &ProgressDialog::slotUpdateCurrentFile);
+    connect(worker_, &FileModifier::signalFinished, progress_dialog_, &ProgressDialog::slotFinished);
+
+    // Подключаем сигнал завершения диалога
+    connect(progress_dialog_, &QDialog::finished, this, &MainWindow::slotDialogFinished);
+
+    // Запускаем обработку
     emit signalStartProcessing(input, output, modify_filename, mask, key, remove);
+
+    // Показываем диалог (блокирует главное окно)
+    progress_dialog_->show();
+}
+
+void MainWindow::slotDialogFinished() {
+    if (progress_dialog_) {
+        disconnect(worker_, nullptr, progress_dialog_, nullptr);
+        progress_dialog_->deleteLater();
+        progress_dialog_ = nullptr;
+    }
+
+    // Разблокируем кнопку запуска
+    run_btn_->setEnabled(true);
+}
+
+void MainWindow::slotExitRequested() {
+    worker_->RequestExit();
+}
+
+void MainWindow::slotPauseRequested() {
+    worker_->RequestPause();
+}
+
+void MainWindow::slotResumeRequested() {
+    worker_->RequestResume();
 }
