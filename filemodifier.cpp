@@ -172,6 +172,7 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
         QString input_file = settings_.input_path_ + "/" + filename;
         QString output_file = settings_.output_path_ + "/" + GetOutputFilename(settings_.output_path_, filename, settings_.modify_filename_);
 
+        emit signalStartFileModification(filename);
         if (!ModifyFile(input_file, output_file)) {
             return;
         }

@@ -17,7 +17,8 @@ public:
 
 signals:
     void signalProgress(int percent);
-    void signalFinished(bool success, const QString &errorMessage);
+    void signalFinished(bool success, const QString &error_message);
+    void signalStartFileModification(const QString &filename);
 
 public slots:
     void slotExitRequested();
