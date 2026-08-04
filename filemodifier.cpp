@@ -59,6 +59,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
                 return false;
             }
             // После возобновления открываем файлы заново с той же позиции
+            offset = recovery_settings_.curr_file_offset_;
             if (!OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
                 emit signalFinished(false, error_msg);
                 return false;
@@ -181,15 +182,17 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
     emit signalFinished(true, QString());
 }
 
-void FileModifier::slotExitRequested() {
+void FileModifier::RequestExit() {
     exit_requested_.store(true);
+    QMutexLocker locker(&wait_mutex_);
+    wait_cond_.wakeAll();
 }
 
-void FileModifier::slotPauseRequested() {
+void FileModifier::RequestPause() {
     pause_requested_.store(true);
 }
 
-void FileModifier::slotResumeRequested() {
+void FileModifier::RequestResume() {
     pause_requested_.store(false);
 
     QMutexLocker locker(&wait_mutex_);

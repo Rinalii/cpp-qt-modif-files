@@ -15,15 +15,14 @@ public:
     explicit FileModifier(QObject *parent = nullptr);
     void ModifyFiles(const QString &input_path, const QString &output_path, bool modify_filename, const QString& mask, const QByteArray &key, bool remove_source);
 
+    void RequestExit();
+    void RequestPause();
+    void RequestResume();
+
 signals:
     void signalProgress(int percent);
     void signalFinished(bool success, const QString &error_message);
     void signalStartFileModification(const QString &filename);
-
-public slots:
-    void slotExitRequested();
-    void slotPauseRequested();
-    void slotResumeRequested();
 
 private:
     struct Settings {
