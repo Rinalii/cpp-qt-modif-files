@@ -12,6 +12,7 @@
 #include <QVBoxLayout>
 #include <QTimeEdit>
 #include <QLabel>
+#include <QFileDialog>
 
 #include "filemodifier.h"
 #include "progressdialog.h"
@@ -54,6 +55,21 @@ void MainWindow::CreateUI() {
     main_layout->addWidget(in_path_label, 3, 0);
     main_layout->addLayout(in_layout, 3, 1);
 
+    auto ClickFolderSelector = [this](QLineEdit *line_edit, const QString &title) {
+        QString curr_dir = line_edit->text().isEmpty() ? QDir::homePath() : line_edit->text();
+        QString dir = QFileDialog::getExistingDirectory(this, title, curr_dir, QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+        if(!dir.isEmpty()) {
+            line_edit->setText(dir);
+        }
+    };
+
+    connect(out_path_btn, &QPushButton::clicked, [this, ClickFolderSelector](){
+        return ClickFolderSelector(out_path_edit_, "Выберите папку для выходных файлов");
+    });
+
+    connect(in_path_btn, &QPushButton::clicked, [this, ClickFolderSelector](){
+        return ClickFolderSelector(in_path_edit_, "Выберите папку для входных файлов");
+    });
 
     //
     QLabel *radiobutton_label = new QLabel("При повторении выходных файлов");
