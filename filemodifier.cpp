@@ -4,6 +4,8 @@
 #include <QDebug>
 #include <QDir>
 
+#include "filesystemutils.h"
+
 FileModifier::FileModifier(QObject *parent)
     : QObject(parent) {
 }
@@ -20,12 +22,12 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
     }
 
     QString error_msg;
-    if (!OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
+    if (!FileSystemUtils::OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
         emit signalFinished(false, error_msg);
         return false;
     }
 
-    if (!OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
+    if (!FileSystemUtils::OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
         in_file.close();
         emit signalFinished(false, error_msg);
         return false;
@@ -60,12 +62,12 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
             }
             // После возобновления открываем файлы заново с той же позиции
             offset = recovery_settings_.curr_file_offset_;
-            if (!OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
+            if (!FileSystemUtils::OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
                 emit signalFinished(false, error_msg);
                 return false;
             }
 
-            if (!OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
+            if (!FileSystemUtils::OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
                 in_file.close();
                 emit signalFinished(false, error_msg);
                 return false;
@@ -111,39 +113,32 @@ void FileModifier::WaitForResume()
     is_paused_.store(false);
 }
 
-bool FileModifier::OpenFile(QFile &file, QIODeviceBase::OpenMode mode, const QString &filepath, qint64 offset, QString &error_msg) {
-    if (!file.open(mode)) {
-        error_msg = "Cannot open file: " + filepath;
-        return false;
-    }
-    if (offset > 0) {
-        if (!file.seek(offset)) {
-            error_msg = "Cannot seek in file: " + filepath;
-            file.close();
-            return false;
-        }
-    }
-    return true;
-}
-
 void FileModifier::ModifyFiles(const QString &input_path, const QString &output_path,
                                bool modify_filename, const QString &mask,
                                const QByteArray &key, bool remove_source) {
     if (!IsKeyValid(key)) return;
+
+    QString error_msg;
 
     settings_.input_path_ = input_path;
     settings_.output_path_ = output_path;
     settings_.modify_filename_ = modify_filename;
     settings_.remove_source_ = remove_source;
     settings_.key_ = key;
-    settings_.filenames_ = GetSuitableFileNames(input_path, mask);
+    if(!FileSystemUtils::GetSuitableFileNames(input_path, mask, settings_.filenames_, error_msg)) {
+        emit signalFinished(false, error_msg);
+        return;
+    }
 
     exit_requested_.store(false);
     pause_requested_.store(false);
     is_paused_.store(false);
 
     bytes_processed_ = 0;
-    if (!CalculateTotalBytes()) return;
+    if(!FileSystemUtils::CalculateTotalBytes(settings_.input_path_, settings_.filenames_, total_bytes_, error_msg)) {
+        emit signalFinished(false, error_msg);
+        return;
+    }
 
     recovery_settings_.Clear();
 
@@ -158,7 +153,12 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
             // Сохраняем индекс текущего файла
             recovery_settings_.curr_file_index_ = i;
             recovery_settings_.curr_input_file_ = settings_.input_path_ + "/" + settings_.filenames_[i];
-            recovery_settings_.curr_output_file_ = settings_.output_path_ + "/" + GetOutputFilename(settings_.output_path_, settings_.filenames_[i], settings_.modify_filename_);
+            QString result_filename;
+            if(!FileSystemUtils::GetOutputFilename(settings_.output_path_, settings_.filenames_[i], settings_.modify_filename_, result_filename, error_msg)) {
+                emit signalFinished(false, error_msg);
+                return;
+            }
+            recovery_settings_.curr_output_file_ = settings_.output_path_ + "/" + result_filename;
             recovery_settings_.curr_file_offset_ = 0; // начало файла
             is_paused_.store(true);
             // Ожидаем снятия паузы
@@ -171,7 +171,13 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
 
         QString filename = settings_.filenames_[i];
         QString input_file = settings_.input_path_ + "/" + filename;
-        QString output_file = settings_.output_path_ + "/" + GetOutputFilename(settings_.output_path_, filename, settings_.modify_filename_);
+
+        QString result_filename;
+        if(!FileSystemUtils::GetOutputFilename(settings_.output_path_, filename, settings_.modify_filename_, result_filename, error_msg)) {
+            emit signalFinished(false, error_msg);
+            return;
+        }
+        QString output_file = settings_.output_path_ + "/" + result_filename;
 
         emit signalStartFileModification(filename);
         if (!ModifyFile(input_file, output_file)) {
@@ -197,90 +203,4 @@ void FileModifier::RequestResume() {
 
     QMutexLocker locker(&wait_mutex_);
     wait_cond_.wakeOne(); // Будим поток
-}
-
-QStringList FileModifier::GetSuitableFileNames(const QString &in_path, const QString &mask) {
-    QDir dir(in_path);
-    if (!dir.exists()) {
-        emit signalFinished(false, "Directory does not exist");
-        return QStringList{};
-    }
-
-    QStringList filters;
-    if (mask.isEmpty()) {
-        // По умолчанию – все файлы
-        filters << "*";
-    } else {
-        QStringList parts = mask.split(',', Qt::SkipEmptyParts);
-        for (QString part : parts) {
-            part = part.trimmed();
-            if (part.isEmpty()) continue;
-            if (part.contains('*') || part.contains('?')) {
-                filters << part;
-            } else if (part.startsWith('.')) {  // Начинается с точки – считаем расширением, добавляем "*"
-                filters << "*" + part;
-            } else {
-                filters << part;                // точное имя
-            }
-        }
-    }
-    if (filters.isEmpty()) {
-        filters << "*";
-    }
-
-    dir.setNameFilters(filters);
-    dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
-    return dir.entryList();
-}
-
-bool FileModifier::CalculateTotalBytes() {
-    total_bytes_ = 0;
-    for (const QString &filename : settings_.filenames_) {
-        QString input_file = settings_.input_path_ + "/" + filename;
-        if (!QFileInfo::exists(input_file)) {
-            emit signalFinished(false, "File " + input_file + " doesn't exists");
-            return false;
-        }
-        total_bytes_ += QFileInfo(input_file).size();
-    }
-    return true;
-}
-
-QString FileModifier::IncrementNumber(const QString &str) {
-    QString result;
-
-    int carry = 1;
-    int i = str.size()-1;
-    for(; i>=0 && carry != 0; --i) {
-        if(!str[i].isDigit()) break;
-        int digit = str[i].digitValue() + carry;
-        if(digit == 10) {
-            result += '0';
-            carry = 1;
-        } else {
-            result += QChar(digit + '0');
-            carry = 0;
-        }
-    }
-    if(carry == 1) {
-        result +='1';
-    }
-    std::reverse(result.begin(), result.end());
-    result = str.left(i+1) + result;
-    return result;
-}
-
-QString FileModifier::GetOutputFilename(const QString &output_path, const QString &filename, bool modify_filename) {
-    if(QFileInfo::exists(output_path + "/" + filename) && modify_filename) {
-        QFileInfo info(filename);
-        QString base_name = info.baseName();
-        QString suffix = info.suffix();
-        QString new_base = IncrementNumber(base_name);
-        if (!suffix.isEmpty()) {
-            return new_base + "." + suffix;
-        } else {
-            return new_base;
-        }
-    }
-    return filename;
 }

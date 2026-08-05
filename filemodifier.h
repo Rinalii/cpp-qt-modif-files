@@ -59,15 +59,8 @@ private:
 
     bool ModifyFile(const QString &input_filepath, const QString &output_filepath);
     bool IsKeyValid(const QByteArray &key);
-    QStringList GetSuitableFileNames(const QString& in_path, const QString& mask);
-    bool CalculateTotalBytes();
 
-    QString GetOutputFilename(const QString &output_path, const QString &filename) const;
-    static QString IncrementNumber(const QString &str);
-    static QString GetOutputFilename(const QString &output_path, const QString &filename, bool modify_filename);
     void WaitForResume();
-
-    static bool OpenFile(QFile& file, QIODevice::OpenMode mode, const QString& filepath, qint64 offset, QString& error_msg);
 
 private:
     // Настройки для обработки файлов
