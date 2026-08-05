@@ -11,6 +11,7 @@ class QTimeEdit;
 class QPushButton;
 class QThread;
 class QTimer;
+class QLabel;
 
 class FileModifier;
 class ProgressDialog;
@@ -44,6 +45,7 @@ private:
     QLineEdit   *in_path_edit_;
     QButtonGroup *out_file_name_gr_;
     QComboBox   *run_mode_cmb_;
+    QLabel      *period_label_;
     QTimeEdit   *period_edit_;
     QLineEdit   *hex_edit_;
 

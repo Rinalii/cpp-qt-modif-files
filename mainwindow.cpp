@@ -11,68 +11,104 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QTimeEdit>
+#include <QLabel>
 
 #include "filemodifier.h"
 #include "progressdialog.h"
 
 void MainWindow::CreateUI() {
     QWidget *central = new QWidget(this);
-    QVBoxLayout *main_layout = new QVBoxLayout(central);
 
+    QGridLayout *main_layout = new QGridLayout(central);
+
+    QLabel *mask_label = new QLabel("Маска входных файлов");
     mask_edit_ = new QLineEdit();
-    del_ifile_chck_ = new QCheckBox();
+    main_layout->addWidget(mask_label, 0, 0);
+    main_layout->addWidget(mask_edit_, 0, 1);
 
+    QLabel *del_label = new QLabel("Удалять входные файлы");
+    del_ifile_chck_ = new QCheckBox();
+    main_layout->addWidget(del_label, 1, 0);
+    main_layout->addWidget(del_ifile_chck_, 1, 1);
+
+
+    //
+    QLabel *out_path_label = new QLabel("Путь выходных файлов");
     QHBoxLayout *out_layout = new QHBoxLayout();
     out_path_edit_ = new QLineEdit();
     QPushButton *out_path_btn = new QPushButton("Обзор...");
-
     out_layout->addWidget(out_path_edit_);
     out_layout->addWidget(out_path_btn);
 
+    main_layout->addWidget(out_path_label, 2, 0);
+    main_layout->addLayout(out_layout, 2, 1);
+
+    //
+    QLabel *in_path_label = new QLabel("Путь входных файлов");
     QHBoxLayout *in_layout = new QHBoxLayout();
     in_path_edit_ = new QLineEdit();
     QPushButton *in_path_btn = new QPushButton("Обзор...");
-
     in_layout->addWidget(in_path_edit_);
     in_layout->addWidget(in_path_btn);
 
+    main_layout->addWidget(in_path_label, 3, 0);
+    main_layout->addLayout(in_layout, 3, 1);
+
+
+    //
+    QLabel *radiobutton_label = new QLabel("При повторении выходных файлов");
     QRadioButton *overwriting_btn = new QRadioButton("Перезапись");
     QRadioButton *modification_btn = new QRadioButton("Модификация");
+    overwriting_btn->setChecked(true);
+
+    QHBoxLayout *radiobutton_layout = new QHBoxLayout();
+    radiobutton_layout->addWidget(overwriting_btn);
+    radiobutton_layout->addWidget(modification_btn);
 
     out_file_name_gr_ = new QButtonGroup(this);
     out_file_name_gr_->addButton(overwriting_btn);
     out_file_name_gr_->addButton(modification_btn);
 
+    main_layout->addWidget(radiobutton_label, 4, 0);
+    main_layout->addLayout(radiobutton_layout, 4, 1);
+
+
+    //
+    QLabel *run_mode_label = new QLabel("Частота работы");
     run_mode_cmb_ = new QComboBox();
 
     run_mode_cmb_->addItem("Разовый запуск");
     run_mode_cmb_->addItem("Работа по таймеру");
 
+    main_layout->addWidget(run_mode_label, 5, 0);
+    main_layout->addWidget(run_mode_cmb_, 5, 1);
+
+
+    //
+    period_label_ = new QLabel("Периодичность опроса");
     period_edit_ = new QTimeEdit();
     period_edit_->setDisplayFormat("HH:mm:ss");
     period_edit_->setTime(QTime(0, 5, 0));
 
-    // Устанавливаем начальную видимость
-    slotRunModeChanged(run_mode_cmb_->currentIndex());
+    main_layout->addWidget(period_label_, 6, 0);
+    main_layout->addWidget(period_edit_, 6, 1);
 
-    // Подключаем сигнал изменения режима
-    connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
+    period_label_->setVisible(false);
 
+
+    //
+    QLabel *hex_label = new QLabel("Ключ в формате hex");
     hex_edit_ = new QLineEdit();
     hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
 
-    main_layout->addWidget(mask_edit_);
-    main_layout->addWidget(del_ifile_chck_);
-    main_layout->addLayout(out_layout);
-    main_layout->addLayout(in_layout);
-    main_layout->addWidget(overwriting_btn);
-    main_layout->addWidget(modification_btn);
-    main_layout->addWidget(run_mode_cmb_);
-    main_layout->addWidget(period_edit_);
-    main_layout->addWidget(hex_edit_);
+    main_layout->addWidget(hex_label, 7, 0);
+    main_layout->addWidget(hex_edit_, 7, 1);
 
+
+    //
     run_btn_ = new QPushButton("Начать");
-    main_layout->addWidget(run_btn_);
+    main_layout->addWidget(run_btn_, 8, 0, 1, 2);
+
     setCentralWidget(central);
 }
 
@@ -99,6 +135,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(timer_, &QTimer::timeout, this, &MainWindow::slotStart);
 
     connect(run_btn_, &QPushButton::clicked, this, &MainWindow::slotStart);
+
+    // Устанавливаем начальную видимость
+    slotRunModeChanged(run_mode_cmb_->currentIndex());
+
+    // Подключаем сигнал изменения режима
+    connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
 }
 
 MainWindow::~MainWindow() {
@@ -204,5 +246,6 @@ void MainWindow::slotResumeRequested() {
 }
 
 void MainWindow::slotRunModeChanged(int idx) {
+    period_label_->setVisible(idx == 1);
     period_edit_->setVisible(idx == 1);
 }
