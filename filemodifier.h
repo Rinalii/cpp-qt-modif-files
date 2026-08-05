@@ -43,20 +43,6 @@ private:
         }
     };
 
-    struct RecoverySettings {
-        int curr_file_index_{0};
-        qint64 curr_file_offset_{0};
-        QString curr_input_file_;
-        QString curr_output_file_;
-
-        void Clear() {
-            curr_file_index_ = 0;
-            curr_file_offset_ = 0;
-            curr_input_file_.clear();
-            curr_output_file_.clear();
-        }
-    };
-
     bool ModifyFile(const QString &input_filepath, const QString &output_filepath);
     bool IsKeyValid(const QByteArray &key);
 
@@ -68,9 +54,6 @@ private:
 
     qint64 bytes_processed_;
     qint64 total_bytes_;
-
-    // Настройки для возобновления обработки с места, на котором остановились
-    RecoverySettings recovery_settings_;
 
     // Выход / пауза
     std::atomic<bool> exit_requested_{false};

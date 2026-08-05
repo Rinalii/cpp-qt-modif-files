@@ -10,16 +10,10 @@ FileModifier::FileModifier(QObject *parent)
     : QObject(parent) {
 }
 
-bool FileModifier::ModifyFile(const QString &input_filepath, const QString &output_filepath)
-{
+bool FileModifier::ModifyFile(const QString &input_filepath, const QString &output_filepath) {
     QFile in_file(input_filepath);
     QFile out_file(output_filepath);
     qint64 offset = 0;
-
-    // Если есть сохранённое смещение для этого файла – используем его
-    if (recovery_settings_.curr_input_file_ == input_filepath && recovery_settings_.curr_file_offset_ > 0) {
-        offset = recovery_settings_.curr_file_offset_;
-    }
 
     QString error_msg;
     if (!FileSystemUtils::OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
@@ -47,9 +41,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
         }
 
         if (pause_requested_.load()) {      // ПАУЗА
-            recovery_settings_.curr_file_offset_ = in_file.pos();
-            recovery_settings_.curr_input_file_ = input_filepath;
-            recovery_settings_.curr_output_file_ = output_filepath;
+            offset = in_file.pos();
 
             in_file.close();
             out_file.close();
@@ -61,7 +53,6 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
                 return false;
             }
             // После возобновления открываем файлы заново с той же позиции
-            offset = recovery_settings_.curr_file_offset_;
             if (!FileSystemUtils::OpenFile(in_file, QIODevice::ReadOnly, input_filepath, offset, error_msg)) {
                 emit signalFinished(false, error_msg);
                 return false;
@@ -84,8 +75,6 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
         int percent = (bytes_processed_ * 100) / total_bytes_;
         emit signalProgress(percent);
     }
-
-    recovery_settings_.Clear();
 
     in_file.close();
     out_file.close();
@@ -140,9 +129,7 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
         return;
     }
 
-    recovery_settings_.Clear();
-
-    for (int i = recovery_settings_.curr_file_index_; i < settings_.filenames_.size(); ++i) {
+    for (int i = 0; i < settings_.filenames_.size(); ++i) {
         if (exit_requested_.load()) {
             emit signalFinished(false, "Operation cancelled by user");
             return;
@@ -150,16 +137,6 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
 
         // Проверка паузы перед началом нового файла
         if (pause_requested_.load()) {
-            // Сохраняем индекс текущего файла
-            recovery_settings_.curr_file_index_ = i;
-            recovery_settings_.curr_input_file_ = settings_.input_path_ + "/" + settings_.filenames_[i];
-            QString result_filename;
-            if(!FileSystemUtils::GetOutputFilename(settings_.output_path_, settings_.filenames_[i], settings_.modify_filename_, result_filename, error_msg)) {
-                emit signalFinished(false, error_msg);
-                return;
-            }
-            recovery_settings_.curr_output_file_ = settings_.output_path_ + "/" + result_filename;
-            recovery_settings_.curr_file_offset_ = 0; // начало файла
             is_paused_.store(true);
             // Ожидаем снятия паузы
             WaitForResume();
