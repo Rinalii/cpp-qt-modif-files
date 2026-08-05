@@ -7,8 +7,10 @@ class QLineEdit;
 class QCheckBox;
 class QButtonGroup;
 class QComboBox;
+class QTimeEdit;
 class QPushButton;
 class QThread;
+class QTimer;
 
 class FileModifier;
 class ProgressDialog;
@@ -40,10 +42,13 @@ private:
     QLineEdit   *in_path_edit_;
     QButtonGroup *out_file_name_gr_;
     QComboBox   *run_mode_cmb_;
-    QLineEdit   *period_edit_;
+    QTimeEdit   *period_edit_;
     QLineEdit   *hex_edit_;
 
     QPushButton *run_btn_;
+
+    bool is_timer_mode_;
+    QTimer *timer_;
 
     FileModifier *worker_;
     QThread *worker_thread_;

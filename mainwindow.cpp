@@ -8,7 +8,9 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QThread>
+#include <QTimer>
 #include <QVBoxLayout>
+#include <QTimeEdit>
 
 #include "filemodifier.h"
 #include "progressdialog.h"
@@ -41,13 +43,14 @@ void MainWindow::CreateUI() {
     out_file_name_gr_->addButton(overwriting_btn);
     out_file_name_gr_->addButton(modification_btn);
 
-
     run_mode_cmb_ = new QComboBox();
 
     run_mode_cmb_->addItem("Разовый запуск");
     run_mode_cmb_->addItem("Работа по таймеру");
 
-    period_edit_ = new QLineEdit();
+    period_edit_ = new QTimeEdit();
+    period_edit_->setDisplayFormat("HH:mm:ss");
+    period_edit_->setTime(QTime(0, 5, 0));
 
     hex_edit_ = new QLineEdit();
     hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
@@ -69,6 +72,7 @@ void MainWindow::CreateUI() {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
+    , is_timer_mode_(false)
     , progress_dialog_(nullptr) {
     CreateUI();
 
@@ -84,6 +88,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Запускаем поток
     worker_thread_->start();
+
+    timer_ = new QTimer(this);
+    connect(timer_, &QTimer::timeout, this, &MainWindow::slotStart);
 
     connect(run_btn_, &QPushButton::clicked, this, &MainWindow::slotStart);
 }
@@ -125,6 +132,20 @@ void MainWindow::slotStart() {
     if (key.isEmpty() || key.size() != 8) {
         QMessageBox::warning(this, "Ошибка", "Ключ должен быть 16 шестнадцатеричных символов");
         return;
+    }
+
+    // Проверка режима таймера
+    is_timer_mode_ = (run_mode_cmb_->currentIndex() == 1);
+    if (is_timer_mode_) {
+        QTime time = period_edit_->time();
+        int period_sec = time.hour() * 3600 + time.minute() * 60 + time.second();
+        if (period_sec <= 0) {
+            QMessageBox::warning(this, "Ошибка", "Некорректный период таймера");
+            return;
+        }
+        timer_->start(period_sec * 1000);
+    } else {
+        timer_->stop();
     }
 
     // Блокируем кнопку запуска
