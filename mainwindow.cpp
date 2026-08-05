@@ -52,6 +52,12 @@ void MainWindow::CreateUI() {
     period_edit_->setDisplayFormat("HH:mm:ss");
     period_edit_->setTime(QTime(0, 5, 0));
 
+    // Устанавливаем начальную видимость
+    slotRunModeChanged(run_mode_cmb_->currentIndex());
+
+    // Подключаем сигнал изменения режима
+    connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
+
     hex_edit_ = new QLineEdit();
     hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
 
@@ -195,4 +201,8 @@ void MainWindow::slotPauseRequested() {
 
 void MainWindow::slotResumeRequested() {
     worker_->RequestResume();
+}
+
+void MainWindow::slotRunModeChanged(int idx) {
+    period_edit_->setVisible(idx == 1);
 }

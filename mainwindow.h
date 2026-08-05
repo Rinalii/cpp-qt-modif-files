@@ -31,6 +31,8 @@ public slots:
     void slotPauseRequested();
     void slotResumeRequested();
 
+    void slotRunModeChanged(int idx);
+
 signals:
     void signalStartProcessing(const QString &input_path, const QString &output_path, bool modify_filename, const QString &mask,
         const QByteArray &key, bool remove_source);
