@@ -12,6 +12,7 @@ class QPushButton;
 class QThread;
 class QTimer;
 class QLabel;
+class QGridLayout;
 
 class FileModifier;
 class ProgressDialog;
@@ -58,6 +59,17 @@ private:
     QThread *worker_thread_;
     ProgressDialog *progress_dialog_;
 
+private:
+    void CreateMaskSection(QGridLayout *layout);
+    void CreateDeleteSection(QGridLayout *layout);
+    void CreatePathSection(QGridLayout *layout, int row, const QString &label_text, QLineEdit *&line_edit, const QString &dialog_title);
+    void CreateOverwriteSection(QGridLayout *layout);
+    void CreateRunModeSection(QGridLayout *layout);
+    void CreatePeriodSection(QGridLayout *layout);
+    void CreateKeySection(QGridLayout *layout);
+    void CreateRunButton(QGridLayout *layout);
+
+    void ShowFolderSelector(QLineEdit *lineEdit, const QString &title);
     void CreateUI();
 };
 #endif // MAINWINDOW_H

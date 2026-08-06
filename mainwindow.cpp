@@ -17,117 +17,6 @@
 #include "filemodifier.h"
 #include "progressdialog.h"
 
-void MainWindow::CreateUI() {
-    QWidget *central = new QWidget(this);
-
-    QGridLayout *main_layout = new QGridLayout(central);
-
-    QLabel *mask_label = new QLabel("Маска входных файлов");
-    mask_edit_ = new QLineEdit();
-    main_layout->addWidget(mask_label, 0, 0);
-    main_layout->addWidget(mask_edit_, 0, 1);
-
-    QLabel *del_label = new QLabel("Удалять входные файлы");
-    del_ifile_chck_ = new QCheckBox();
-    main_layout->addWidget(del_label, 1, 0);
-    main_layout->addWidget(del_ifile_chck_, 1, 1);
-
-
-    //
-    QLabel *out_path_label = new QLabel("Путь выходных файлов");
-    QHBoxLayout *out_layout = new QHBoxLayout();
-    out_path_edit_ = new QLineEdit();
-    QPushButton *out_path_btn = new QPushButton("Обзор...");
-    out_layout->addWidget(out_path_edit_);
-    out_layout->addWidget(out_path_btn);
-
-    main_layout->addWidget(out_path_label, 2, 0);
-    main_layout->addLayout(out_layout, 2, 1);
-
-    //
-    QLabel *in_path_label = new QLabel("Путь входных файлов");
-    QHBoxLayout *in_layout = new QHBoxLayout();
-    in_path_edit_ = new QLineEdit();
-    QPushButton *in_path_btn = new QPushButton("Обзор...");
-    in_layout->addWidget(in_path_edit_);
-    in_layout->addWidget(in_path_btn);
-
-    main_layout->addWidget(in_path_label, 3, 0);
-    main_layout->addLayout(in_layout, 3, 1);
-
-    auto ClickFolderSelector = [this](QLineEdit *line_edit, const QString &title) {
-        QString curr_dir = line_edit->text().isEmpty() ? QDir::homePath() : line_edit->text();
-        QString dir = QFileDialog::getExistingDirectory(this, title, curr_dir, QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-        if(!dir.isEmpty()) {
-            line_edit->setText(dir);
-        }
-    };
-
-    connect(out_path_btn, &QPushButton::clicked, [this, ClickFolderSelector](){
-        return ClickFolderSelector(out_path_edit_, "Выберите папку для выходных файлов");
-    });
-
-    connect(in_path_btn, &QPushButton::clicked, [this, ClickFolderSelector](){
-        return ClickFolderSelector(in_path_edit_, "Выберите папку для входных файлов");
-    });
-
-    //
-    QLabel *radiobutton_label = new QLabel("При повторении выходных файлов");
-    QRadioButton *overwriting_btn = new QRadioButton("Перезапись");
-    QRadioButton *modification_btn = new QRadioButton("Модификация");
-    overwriting_btn->setChecked(true);
-
-    QHBoxLayout *radiobutton_layout = new QHBoxLayout();
-    radiobutton_layout->addWidget(overwriting_btn);
-    radiobutton_layout->addWidget(modification_btn);
-
-    out_file_name_gr_ = new QButtonGroup(this);
-    out_file_name_gr_->addButton(overwriting_btn);
-    out_file_name_gr_->addButton(modification_btn);
-
-    main_layout->addWidget(radiobutton_label, 4, 0);
-    main_layout->addLayout(radiobutton_layout, 4, 1);
-
-
-    //
-    QLabel *run_mode_label = new QLabel("Частота работы");
-    run_mode_cmb_ = new QComboBox();
-
-    run_mode_cmb_->addItem("Разовый запуск");
-    run_mode_cmb_->addItem("Работа по таймеру");
-
-    main_layout->addWidget(run_mode_label, 5, 0);
-    main_layout->addWidget(run_mode_cmb_, 5, 1);
-
-
-    //
-    period_label_ = new QLabel("Периодичность опроса");
-    period_edit_ = new QTimeEdit();
-    period_edit_->setDisplayFormat("HH:mm:ss");
-    period_edit_->setTime(QTime(0, 5, 0));
-
-    main_layout->addWidget(period_label_, 6, 0);
-    main_layout->addWidget(period_edit_, 6, 1);
-
-    period_label_->setVisible(false);
-
-
-    //
-    QLabel *hex_label = new QLabel("Ключ в формате hex");
-    hex_edit_ = new QLineEdit();
-    hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
-
-    main_layout->addWidget(hex_label, 7, 0);
-    main_layout->addWidget(hex_edit_, 7, 1);
-
-
-    //
-    run_btn_ = new QPushButton("Начать");
-    main_layout->addWidget(run_btn_, 8, 0, 1, 2);
-
-    setCentralWidget(central);
-}
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , is_timer_mode_(false)
@@ -149,14 +38,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::slotStart);
-
-    connect(run_btn_, &QPushButton::clicked, this, &MainWindow::slotStart);
-
-    // Устанавливаем начальную видимость
-    slotRunModeChanged(run_mode_cmb_->currentIndex());
-
-    // Подключаем сигнал изменения режима
-    connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
 }
 
 MainWindow::~MainWindow() {
@@ -173,6 +54,125 @@ MainWindow::~MainWindow() {
     worker_thread_->wait();
 
     delete worker_;
+}
+
+void MainWindow::CreateUI() {
+    QWidget *central = new QWidget(this);
+    QGridLayout *main_layout = new QGridLayout(central);
+
+    CreateMaskSection(main_layout);
+    CreateDeleteSection(main_layout);
+    CreatePathSection(main_layout, 2, "Путь выходных файлов", out_path_edit_, "Выберите папку для выходных файлов");
+    CreatePathSection(main_layout, 3, "Путь входных файлов", in_path_edit_, "Выберите папку для входных файлов");
+    CreateOverwriteSection(main_layout);
+    CreateRunModeSection(main_layout);
+    CreatePeriodSection(main_layout);
+    CreateKeySection(main_layout);
+    CreateRunButton(main_layout);
+
+    setCentralWidget(central);
+}
+
+void MainWindow::CreateMaskSection(QGridLayout *layout) {
+    QLabel *mask_label = new QLabel("Маска входных файлов");
+    mask_edit_ = new QLineEdit();
+    layout->addWidget(mask_label, 0, 0);
+    layout->addWidget(mask_edit_, 0, 1);
+}
+
+void MainWindow::CreateDeleteSection(QGridLayout *layout) {
+    QLabel *del_label = new QLabel("Удалять входные файлы");
+    del_ifile_chck_ = new QCheckBox();
+    layout->addWidget(del_label, 1, 0);
+    layout->addWidget(del_ifile_chck_, 1, 1);
+}
+
+void MainWindow::CreatePathSection(QGridLayout *layout, int row, const QString &label_text,
+    QLineEdit *&line_edit, const QString &dialog_title) {
+
+    QLabel *label = new QLabel(label_text);
+    QHBoxLayout *h_layout = new QHBoxLayout();
+    line_edit = new QLineEdit();
+    QPushButton *button = new QPushButton("Обзор...");
+    h_layout->addWidget(line_edit);
+    h_layout->addWidget(button);
+
+    layout->addWidget(label, row, 0);
+    layout->addLayout(h_layout, row, 1);
+
+    connect(button, &QPushButton::clicked, [this, line_edit, dialog_title]() {
+        ShowFolderSelector(line_edit, dialog_title);
+    });
+}
+
+void MainWindow::CreateOverwriteSection(QGridLayout *layout) {
+    QLabel *radiobutton_label = new QLabel("При повторении выходных файлов");
+    QRadioButton *overwriting_btn = new QRadioButton("Перезапись");
+    QRadioButton *modification_btn = new QRadioButton("Модификация");
+    overwriting_btn->setChecked(true);
+
+    QHBoxLayout *radiobutton_layout = new QHBoxLayout();
+    radiobutton_layout->addWidget(overwriting_btn);
+    radiobutton_layout->addWidget(modification_btn);
+
+    out_file_name_gr_ = new QButtonGroup(this);
+    out_file_name_gr_->addButton(overwriting_btn, 0);   // перезапись
+    out_file_name_gr_->addButton(modification_btn, 1);  // модификация
+
+    layout->addWidget(radiobutton_label, 4, 0);
+    layout->addLayout(radiobutton_layout, 4, 1);
+}
+
+void MainWindow::CreateRunModeSection(QGridLayout *layout) {
+    QLabel *run_mode_label = new QLabel("Частота работы");
+    run_mode_cmb_ = new QComboBox();
+    run_mode_cmb_->addItem("Разовый запуск");
+    run_mode_cmb_->addItem("Работа по таймеру");
+    layout->addWidget(run_mode_label, 5, 0);
+    layout->addWidget(run_mode_cmb_, 5, 1);
+
+    // Устанавливаем начальную видимость
+    slotRunModeChanged(run_mode_cmb_->currentIndex());
+
+    // Подключаем сигнал изменения режима
+    connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
+}
+
+void MainWindow::CreatePeriodSection(QGridLayout *layout) {
+    period_label_ = new QLabel("Периодичность опроса");
+    period_edit_ = new QTimeEdit();
+    period_edit_->setDisplayFormat("HH:mm:ss");
+    period_edit_->setTime(QTime(0, 5, 0));
+
+    layout->addWidget(period_label_, 6, 0);
+    layout->addWidget(period_edit_, 6, 1);
+
+    period_label_->setVisible(false);
+    period_edit_->setVisible(false);
+}
+
+void MainWindow::CreateKeySection(QGridLayout *layout) {
+    QLabel *hex_label = new QLabel("Ключ в формате hex");
+    hex_edit_ = new QLineEdit();
+    hex_edit_->setInputMask("HHHHHHHHHHHHHHHH");
+    layout->addWidget(hex_label, 7, 0);
+    layout->addWidget(hex_edit_, 7, 1);
+}
+
+void MainWindow::CreateRunButton(QGridLayout *layout) {
+    run_btn_ = new QPushButton("Начать");
+    layout->addWidget(run_btn_, 8, 0, 1, 2);
+
+    connect(run_btn_, &QPushButton::clicked, this, &MainWindow::slotStart);
+}
+
+void MainWindow::ShowFolderSelector(QLineEdit *lineEdit, const QString &title) {
+    QString curr_dir = lineEdit->text().isEmpty() ? QDir::homePath() : lineEdit->text();
+    QString dir = QFileDialog::getExistingDirectory(this, title, curr_dir,
+                                                    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if (!dir.isEmpty()) {
+        lineEdit->setText(dir);
+    }
 }
 
 void MainWindow::slotStart() {
@@ -262,6 +262,7 @@ void MainWindow::slotResumeRequested() {
 }
 
 void MainWindow::slotRunModeChanged(int idx) {
-    period_label_->setVisible(idx == 1);
-    period_edit_->setVisible(idx == 1);
+    bool is_timer = (idx == 1);
+    period_label_->setVisible(is_timer);
+    period_edit_->setVisible(is_timer);
 }
