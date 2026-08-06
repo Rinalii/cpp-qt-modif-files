@@ -16,7 +16,8 @@ ProgressDialog::ProgressDialog(QWidget *parent)
     , is_finished_(false) {
     setWindowTitle("Обработка файлов");
     setModal(true);  // Блокируем главное окно
-    setMinimumWidth(450);
+    resize(450, 150);
+    setMinimumSize(size());
 
     progress_bar_ = new QProgressBar(this);
     progress_bar_->setRange(0, 100);
