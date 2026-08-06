@@ -21,7 +21,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
         return false;
     }
 
-    if (!FileSystemUtils::OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
+    if (!FileSystemUtils::OpenFile(out_file, QIODevice::WriteOnly | QIODevice::Truncate, output_filepath, offset, error_msg)) {
         in_file.close();
         emit signalFinished(false, error_msg);
         return false;
@@ -49,6 +49,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
 
             WaitForResume();    // Ожидаем возобновления
             if (exit_requested_.load()) {
+                QFile::remove(output_filepath);
                 emit signalFinished(false, "Operation cancelled by user");
                 return false;
             }
@@ -58,7 +59,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
                 return false;
             }
 
-            if (!FileSystemUtils::OpenFile(out_file, QIODevice::ReadWrite, output_filepath, offset, error_msg)) {
+            if (!FileSystemUtils::OpenFile(out_file, QIODevice::WriteOnly, output_filepath, offset, error_msg)) {
                 in_file.close();
                 emit signalFinished(false, error_msg);
                 return false;
@@ -129,6 +130,11 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
         return;
     }
 
+    if (!FileSystemUtils::EnsureDirectoryExists(output_path, error_msg)) {
+        emit signalFinished(false, error_msg);
+        return;
+    }
+
     for (int i = 0; i < settings_.filenames_.size(); ++i) {
         if (exit_requested_.load()) {
             emit signalFinished(false, "Operation cancelled by user");
@@ -159,6 +165,11 @@ void FileModifier::ModifyFiles(const QString &input_path, const QString &output_
         emit signalStartFileModification(filename);
         if (!ModifyFile(input_file, output_file)) {
             return;
+        }
+
+        // Удаление исходного файла, если требуется
+        if (settings_.remove_source_ && input_file != output_file) {
+            QFile::remove(input_file);
         }
     }
 
