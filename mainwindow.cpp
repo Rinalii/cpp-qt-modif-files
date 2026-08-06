@@ -70,6 +70,9 @@ void MainWindow::CreateUI() {
     CreateKeySection(main_layout);
     CreateRunButton(main_layout);
 
+    // Устанавливаем начальную видимость
+    slotRunModeChanged(run_mode_cmb_->currentIndex());
+
     setCentralWidget(central);
 }
 
@@ -130,9 +133,6 @@ void MainWindow::CreateRunModeSection(QGridLayout *layout) {
     run_mode_cmb_->addItem("Работа по таймеру");
     layout->addWidget(run_mode_label, 5, 0);
     layout->addWidget(run_mode_cmb_, 5, 1);
-
-    // Устанавливаем начальную видимость
-    slotRunModeChanged(run_mode_cmb_->currentIndex());
 
     // Подключаем сигнал изменения режима
     connect(run_mode_cmb_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::slotRunModeChanged);
