@@ -170,14 +170,10 @@ private:
      * @brief Обрабатывает данные файла: читает блоками, применяет XOR, записывает.
      * @param in_file Ссылка на открытый входной файл.
      * @param out_file Ссылка на открытый выходной файл.
-     * @param key Ключ шифрования.
-     * @param total_bytes Общее количество байт для обработки (используется для прогресса).
-     * @param bytes_processed Ссылка на счётчик обработанных байт (обновляется).
      * @param error_msg Строка для сообщения об ошибке.
      * @return true, если все данные обработаны успешно.
      */
-    bool ProcessFileData(QFile &in_file, QFile &out_file, const QByteArray &key, qint64 total_bytes,
-                qint64 &bytes_processed, QString &error_msg);
+    bool ProcessFileData(QFile &in_file, QFile &out_file, QString &error_msg);
 
     /**
      * @brief Обрабатывает запрос паузы: закрывает файлы, ждёт возобновления,

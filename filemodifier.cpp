@@ -85,7 +85,7 @@ bool FileModifier::ModifyFile(const QString &input_filepath, const QString &outp
         return false;
     }
 
-    bool success = ProcessFileData(in_file, out_file, settings_.key_, total_bytes_, bytes_processed_, error_msg);
+    bool success = ProcessFileData(in_file, out_file, error_msg);
 
     in_file.close();
     out_file.close();
@@ -107,7 +107,7 @@ bool FileModifier::PrepareProcessing(const QString &input_path, const QString &o
     settings_.remove_source_ = remove_source;
     settings_.key_ = key;
 
-    if (!FileSystemUtils::GetSuitableFileNames(input_path, mask, settings_.filenames_, error_msg)) {
+    if (!FileSystemUtils::GetSuitableFileNames(settings_.input_path_, mask, settings_.filenames_, error_msg)) {
         return false;
     }
 
@@ -125,7 +125,7 @@ bool FileModifier::PrepareProcessing(const QString &input_path, const QString &o
         return false;
     }
 
-    if (!FileSystemUtils::EnsureDirectoryExists(output_path, error_msg)) {
+    if (!FileSystemUtils::EnsureDirectoryExists(settings_.output_path_, error_msg)) {
         return false;
     }
 
@@ -153,12 +153,11 @@ bool FileModifier::OpenFiles(QFile &in_file, QFile &out_file, const QString &inp
     return true;
 }
 
-bool FileModifier::ProcessFileData(QFile &in_file, QFile &out_file, const QByteArray &key, qint64 total_bytes,
-                qint64 &bytes_processed, QString &error_msg) {
+bool FileModifier::ProcessFileData(QFile &in_file, QFile &out_file, QString &error_msg) {
 
     error_msg.clear();
     const qint64 buffer_size = 1024 * 1024;
-    const int key_size = key.size();
+    const int key_size = settings_.key_.size();
     QByteArray chunk;
 
     while (!in_file.atEnd()) {
@@ -176,12 +175,12 @@ bool FileModifier::ProcessFileData(QFile &in_file, QFile &out_file, const QByteA
 
         chunk = in_file.read(buffer_size);
         for (int i = 0; i < chunk.size(); ++i) {
-            chunk[i] ^= key[i % key_size];
+            chunk[i] ^= settings_.key_[i % key_size];
         }
         out_file.write(chunk);
 
-        bytes_processed += chunk.size();
-        int percent = (bytes_processed * 100) / total_bytes;
+        bytes_processed_ += chunk.size();
+        int percent = (bytes_processed_ * 100) / total_bytes_;
         emit signalProgress(percent);
     }
     return true;
