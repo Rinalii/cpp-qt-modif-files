@@ -141,7 +141,7 @@ bool FileModifier::OpenFiles(QFile &in_file, QFile &out_file, const QString &inp
         return false;
     }
 
-    QIODevice::OpenMode mode = QIODevice::WriteOnly;
+    QIODevice::OpenMode mode = QIODevice::ReadWrite;
     if (offset == 0) {
         mode |= QIODevice::Truncate;
     }
@@ -191,7 +191,9 @@ bool FileModifier::HandlePause(QFile &in_file, QFile &out_file, const QString &i
                 qint64 &offset, QString &error_msg) {
 
     error_msg.clear();
+
     in_file.close();
+    out_file.flush();
     out_file.close();
 
     is_paused_.store(true);
@@ -243,7 +245,6 @@ void FileModifier::RequestPause() {
 
 void FileModifier::RequestResume() {
     pause_requested_.store(false);
-
     QMutexLocker locker(&wait_mutex_);
-    wait_cond_.wakeOne(); // Будим поток
+    wait_cond_.wakeAll();
 }
